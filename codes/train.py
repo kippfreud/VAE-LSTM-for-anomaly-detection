@@ -1,11 +1,18 @@
 import os
 import tensorflow as tf
-from data_loader import DataGenerator
+from data_loader import DataGenerator, SoralinkDataGenerator
 from models import VAEmodel, lstmKerasModel
 from trainers import vaeTrainer
 from utils import process_config, create_dirs, get_args, save_config
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+tf.compat.v1.disable_eager_execution()
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
 
 
 def main():
@@ -23,9 +30,10 @@ def main():
     # save the config in a txt file
     save_config(config)
     # create tensorflow session
-    sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+    sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(log_device_placement=True))
     # create your data generator
-    data = DataGenerator(config)
+    data = SoralinkDataGenerator(config)
+    #data = DataGenerator(config)
     # create a CNN model
     model_vae = VAEmodel(config)
     # create a trainer for VAE model

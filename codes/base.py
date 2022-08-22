@@ -52,51 +52,51 @@ class BaseModel:
 
   # initialize a tensorflow variable to use it as epoch counter
   def init_cur_epoch(self):
-    with tf.variable_scope('cur_epoch'):
+    with tf.compat.v1.variable_scope('cur_epoch'):
       self.cur_epoch_tensor = tf.Variable(0, trainable=False, name='cur_epoch')
-      self.increment_cur_epoch_tensor = tf.assign(self.cur_epoch_tensor, self.cur_epoch_tensor + 1)
+      self.increment_cur_epoch_tensor = tf.compat.v1.assign(self.cur_epoch_tensor, self.cur_epoch_tensor + 1)
 
   # just initialize a tensorflow variable to use it as global step counter
   def init_global_step(self):
     # DON'T forget to add the global step tensor to the tensorflow trainer
-    with tf.variable_scope('global_step'):
+    with tf.compat.v1.variable_scope('global_step'):
       self.global_step_tensor = tf.Variable(0, trainable=False, name='global_step')
-      self.increment_global_step_tensor = tf.assign(
+      self.increment_global_step_tensor = tf.compat.v1.assign(
         self.global_step_tensor, self.global_step_tensor + 1)
 
   def define_loss(self):
-    with tf.name_scope("loss"):
+    with tf.compat.v1.name_scope("loss"):
       # KL divergence loss - analytical result
-      KL_loss = 0.5 * (tf.reduce_sum(tf.square(self.code_mean), 1)
-                       + tf.reduce_sum(tf.square(self.code_std_dev), 1)
-                       - tf.reduce_sum(tf.log(tf.square(self.code_std_dev)), 1)
+      KL_loss = 0.5 * (tf.reduce_sum(input_tensor=tf.square(self.code_mean), axis=1)
+                       + tf.reduce_sum(input_tensor=tf.square(self.code_std_dev), axis=1)
+                       - tf.reduce_sum(input_tensor=tf.math.log(tf.square(self.code_std_dev)), axis=1)
                        - self.config['code_size'])
-      self.KL_loss = tf.reduce_mean(KL_loss)
+      self.KL_loss = tf.reduce_mean(input_tensor=KL_loss)
 
       # norm 1 of standard deviation of the sample-wise encoder prediction
-      self.std_dev_norm = tf.reduce_mean(self.code_std_dev, axis=0)
+      self.std_dev_norm = tf.reduce_mean(input_tensor=self.code_std_dev, axis=0)
 
       weighted_reconstruction_error_dataset = tf.reduce_sum(
-        tf.square(self.original_signal - self.decoded), [1, 2])
-      weighted_reconstruction_error_dataset = tf.reduce_mean(weighted_reconstruction_error_dataset)
+        input_tensor=tf.square(self.original_signal - self.decoded), axis=[1, 2])
+      weighted_reconstruction_error_dataset = tf.reduce_mean(input_tensor=weighted_reconstruction_error_dataset)
       self.weighted_reconstruction_error_dataset = weighted_reconstruction_error_dataset / (2 * self.sigma2)
 
       # least squared reconstruction error
       ls_reconstruction_error = tf.reduce_sum(
-        tf.square(self.original_signal - self.decoded), [1, 2])
-      self.ls_reconstruction_error = tf.reduce_mean(ls_reconstruction_error)
+        input_tensor=tf.square(self.original_signal - self.decoded), axis=[1, 2])
+      self.ls_reconstruction_error = tf.reduce_mean(input_tensor=ls_reconstruction_error)
 
       # sigma regularisor - input elbo
-      self.sigma_regularisor_dataset = self.input_dims / 2 * tf.log(self.sigma2)
+      self.sigma_regularisor_dataset = self.input_dims / 2 * tf.math.log(self.sigma2)
       two_pi = self.input_dims / 2 * tf.constant(2 * np.pi)
 
       self.elbo_loss = two_pi + self.sigma_regularisor_dataset + \
                        0.5 * self.weighted_reconstruction_error_dataset + self.KL_loss
 
   def training_variables(self):
-    encoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "encoder")
-    decoder_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "decoder")
-    sigma_vars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, "sigma2_dataset")
+    encoder_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, "encoder")
+    decoder_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, "decoder")
+    sigma_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, "sigma2_dataset")
     self.train_vars_VAE = encoder_vars + decoder_vars + sigma_vars
 
     num_encoder = count_trainable_variables('encoder')
@@ -106,9 +106,9 @@ class BaseModel:
     print("Total number of trainable parameters in the VAE network is: {}".format(self.num_vars_total))
 
   def compute_gradients(self):
-    self.lr = tf.placeholder(tf.float32, [])
-    opt = tf.train.AdamOptimizer(learning_rate=self.lr, beta1=0.9, beta2=0.95)
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+    self.lr = tf.compat.v1.placeholder(tf.float32, [])
+    opt = tf.compat.v1.train.AdamOptimizer(learning_rate=self.lr, beta1=0.9, beta2=0.95)
+    update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
     gvs_dataset = opt.compute_gradients(self.elbo_loss, var_list=self.train_vars_VAE)
     print('gvs for dataset: {}'.format(gvs_dataset))
     capped_gvs = [(self.ClipIfNotNone(grad), var) for grad, var in gvs_dataset]
@@ -123,7 +123,7 @@ class BaseModel:
     return tf.clip_by_value(grad, -1, 1)
 
   def init_saver(self):
-    self.saver = tf.train.Saver(max_to_keep=1, var_list=self.train_vars_VAE)
+    self.saver = tf.compat.v1.train.Saver(max_to_keep=1, var_list=self.train_vars_VAE)
 
 
 class BaseTrain:
@@ -132,8 +132,8 @@ class BaseTrain:
     self.config = config
     self.sess = sess
     self.data = data
-    self.init = tf.group(tf.global_variables_initializer(),
-                         tf.local_variables_initializer())
+    self.init = tf.group(tf.compat.v1.global_variables_initializer(),
+                         tf.compat.v1.local_variables_initializer())
     self.sess.run(self.init)
 
     # keep a record of the training result
